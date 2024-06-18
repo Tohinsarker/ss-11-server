@@ -22,20 +22,19 @@ app.use(express.json());
 
 const verify = (req, res, next) => {
   const token = req.cookies.token;
-  if(!token) return res.status(401).send({message: 'unauthorized access'})
+  if (!token) return res.status(401).send({ message: "unauthorized access" });
   if (token) {
     jwt.verify(token, process.env.TOKEN, (error, decoded) => {
       if (error) {
-        res.status(401).send({message: 'unauthorized access'})
+        res.status(401).send({ message: "unauthorized access" });
         return;
       }
 
-      req.user = decoded
+      req.user = decoded;
       next();
     });
   }
   console.log("token", token);
-
 };
 
 // concept11 HNQwfIbieRow50hJ
@@ -94,6 +93,20 @@ async function run() {
     // save bids data
     app.post("/bid", async (req, res) => {
       const bidData = req.body;
+
+      // duplicate reques
+      const query = {
+        email: bidData.email,
+        jobId: bidData.jobId,
+      };
+      const allreadyApplied = await bidsCollection.findOne({
+        email: bidData.email,
+        jobId: bidData.jobId,
+      });
+      console.log("qu", allreadyApplied);
+      if (allreadyApplied) {
+        return res.status(400).send("all ready added");
+      }
       const result = await bidsCollection.insertOne(bidData);
       res.send(result);
     });
@@ -109,8 +122,8 @@ async function run() {
       const email = req.params.email;
       const query = { "buyer.email": email };
       const tokenEmail = req.user.email;
-      if(tokenEmail !== email){
-        return res.status(401).send({message: 'unauthorized access'});
+      if (tokenEmail !== email) {
+        return res.status(401).send({ message: "unauthorized access" });
       }
       const result = await jobsCollection.find(query).toArray();
       res.send(result);
@@ -166,6 +179,24 @@ async function run() {
       res.send(result);
     });
 
+    /// pagination 
+    app.get("/all-jobs", async (req, res) => {
+      const size = parseInt(req.query.size);
+      const page = parseInt(req.query.page)-1;
+      console.log(size, page);
+      const result = await jobsCollection
+        .find()
+        .skip(size*page)
+        .limit(size)
+        .toArray()
+      res.send(result);
+    });
+
+    app.get("/jobs-count", async (req, res) => {
+      const count = await jobsCollection.countDocuments();
+      res.send({ count });
+    });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
@@ -183,7 +214,6 @@ app.get("/", (req, res) => {
 app.listen(port, () => {
   console.log("running on port ", port);
 });
-
 
 // DB_USER=concept11
 // DB_PASSWORD=HNQwfIbieRow50hJ
